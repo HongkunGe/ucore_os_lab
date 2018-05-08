@@ -86,6 +86,8 @@ TARGETS	:=
 
 include tools/function.mk
 
+$(info [genral] ====== define util function =======)
+# find all files in $(1) with type c oR S.
 listf_cc = $(call listf,$(1),$(CTYPE))
 
 # for cc
@@ -105,20 +107,26 @@ symfile = $(call cgtype,$(call toobj,$(1)),o,sym)
 # for match pattern
 match = $(shell echo $(2) | $(AWK) '{for(i=1;i<=NF;i++){if(match("$(1)","^"$$(i)"$$")){exit 1;}}}'; echo $$?)
 
+$(info [genral] ====== define util function end =======)
+
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # include kernel/user
-
+$(info [genral] ====== compile libs folder =======)
 INCLUDE	+= libs/
 
 CFLAGS	+= $(addprefix -I,$(INCLUDE))
-
 LIBDIR	+= libs
 
-$(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
+$(info [genral] listf_cc $(call listf_cc,$(LIBDIR)))
+# compile c files in ./libs directory to related objects.
+# add to ALLOBJS
+$(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)  
+$(call target_print)
+$(info [genral] ====== compile libs folder end =======)
 
 # -------------------------------------------------------------------
 # kernel
-
+$(info [genral] ====== compile kern folder =======)
 KINCLUDE	+= kern/debug/ \
 			   kern/driver/ \
 			   kern/trap/ \
@@ -133,12 +141,18 @@ KSRCDIR		+= kern/init \
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
+# compile kern directory to __objs_kernel object
 $(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
+$(call target_print)
 
+# iterate over 'kernel libs' to expand nested variable references to get all object files.
+# https://www.gnu.org/software/make/manual/make.html#Computed-Names
 KOBJS	= $(call read_packet,kernel libs)
+$(info [genral] KOBJS $(KOBJS))
 
-# create kernel target
+# create kernel target bin/kernel
 kernel = $(call totarget,kernel)
+$(info [genral] kernel $(kernel))
 
 $(kernel): tools/kernel.ld
 
@@ -148,11 +162,16 @@ $(kernel): $(KOBJS)
 	@$(OBJDUMP) -S $@ > $(call asmfile,kernel)
 	@$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel)
 
+# compile the target bin/kernel
+# add bin/kernel to TARGET
 $(call create_target,kernel)
+$(call target_print)
+$(info [genral] ====== compile kern folder end =======)
 
 # -------------------------------------------------------------------
-
 # create bootblock
+#TODO: understand this.
+$(info [genral] ====== compile boot folder =======)
 bootfiles = $(call listf_cc,boot)
 $(foreach f,$(bootfiles),$(call cc_compile,$(f),$(CC),$(CFLAGS) -Os -nostdinc))
 
@@ -166,17 +185,22 @@ $(bootblock): $(call toobj,$(bootfiles)) | $(call totarget,sign)
 	@$(call totarget,sign) $(call outfile,bootblock) $(bootblock)
 
 $(call create_target,bootblock)
-
+$(call target_print)
+$(info [genral] ====== compile boot folder end =======)
 # -------------------------------------------------------------------
-
 # create 'sign' tools
+
+$(info [genral] ====== compile tools folder sign =======)
 $(call add_files_host,tools/sign.c,sign,sign)
 $(call create_target_host,sign,sign)
+$(call target_print)
+$(info [genral] ====== compile tools folder sign end =======)
 
 # -------------------------------------------------------------------
 
 # create ucore.img
 UCOREIMG	:= $(call totarget,ucore.img)
+$(info [genral] UCOREIMG $(UCOREIMG): $(kernel) $(bootblock))
 
 $(UCOREIMG): $(kernel) $(bootblock)
 	$(V)dd if=/dev/zero of=$@ count=10000
@@ -184,11 +208,10 @@ $(UCOREIMG): $(kernel) $(bootblock)
 	$(V)dd if=$(kernel) of=$@ seek=1 conv=notrunc
 
 $(call create_target,ucore.img)
-
+$(call target_print)
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 $(call finish_all)
-
 IGNORE_ALLDEPS	= clean \
 				  dist-clean \
 				  grade \
