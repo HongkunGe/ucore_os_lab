@@ -4,9 +4,14 @@ OBJPREFIX	:= __objs_
 # -------------------- function begin --------------------
 
 # list all files in some directories: (#directories, #types)
+# bootfiles = $(call listf_cc,boot)
+#   ==>> call listf,boot,"c S"
+#   ==>> filter $(if "c S","%.c %.S",%),$(wildcard boot/*) #if-condition: string not empty,"%.c %.S" is res, else %
+#   ==>> filter "%.c %.S", "asm.h bootasm.S bootasm.c" #use the filter function to remove non-matching file names
+# 	==>> bootasm.S bootasm.c
 listf = $(filter $(if $(2),$(addprefix %.,$(2)),%),\
 		  $(wildcard $(addsuffix $(SLASH)*,$(1))))
-		  
+
 define do_listf_print
 __info__print__ := $(call listf,$(1),$(2))
 $(info [function] listf_print $(__info__print__))
