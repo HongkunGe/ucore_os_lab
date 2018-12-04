@@ -25,7 +25,7 @@ start:
     # Enable A20:
     #  For backwards compatibility with the earliest PCs, physical
     #  address line 20 is tied low, so that addresses higher than
-    #  1BM wrap around to zero by default. This code undoes this.
+    #  1MB wrap around to zero by default. This code undoes this.
 seta20.1:
     # Wait for not busy(8042 input buffer empty), Input buffer status (0 = empty, 1 = full).
     # http://www.independent-software.com/writing-your-own-toy-operating-system-enabling-the-a20-line/
@@ -80,6 +80,7 @@ seta20.2:
 .code32                                             # Assemble for 32-bit mode
 protcseg:
     # Set up the protected-mode data segment registers
+    # Item 6. https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-1/real_mode_switch_protect_mode.html
     movw $PROT_MODE_DSEG, %ax                       # Our data segment selector
     movw %ax, %ds                                   # -> DS: Data Segment
     movw %ax, %es                                   # -> ES: Extra Segment

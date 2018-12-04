@@ -46,8 +46,8 @@ readsect(void *dst, uint32_t secno) {
     // wait for disk to be ready
     waitdisk();
 
-    outb(0x1F2, 1);                         // count = 1
-    outb(0x1F3, secno & 0xFF);
+    outb(0x1F2, 1);                         // count = 1, read one sector
+    outb(0x1F3, secno & 0xFF);				// setup LBA parameters
     outb(0x1F4, (secno >> 8) & 0xFF);
     outb(0x1F5, (secno >> 16) & 0xFF);
     outb(0x1F6, ((secno >> 24) & 0xF) | 0xE0);
@@ -57,7 +57,7 @@ readsect(void *dst, uint32_t secno) {
     waitdisk();
 
     // read a sector
-    insl(0x1F0, dst, SECTSIZE / 4);
+    insl(0x1F0, dst, SECTSIZE / 4); // read from port 0x1F0 in long, so 512 / 4
 }
 
 /* *
@@ -97,6 +97,10 @@ bootmain(void) {
 
     // load each program segment (ignores ph flags)
     ph = (struct proghdr *)((uintptr_t)ELFHDR + ELFHDR->e_phoff);
+    // ph is a pointer of proghdr(program header). Addition of pointer variable actually
+    // works in terms of pointer based type, proghdr in this case.
+    // So `ph + ELF->e_phnum` means adding sizeof(proghdr) * e_phnum to ph, which
+    // gives you the ending address of program header.
     eph = ph + ELFHDR->e_phnum;
     for (; ph < eph; ph ++) {
         readseg(ph->p_va & 0xFFFFFF, ph->p_memsz, ph->p_offset);

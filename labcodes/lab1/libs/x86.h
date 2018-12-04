@@ -35,6 +35,7 @@ static inline void sti(void) __attribute__((always_inline));
 static inline void cli(void) __attribute__((always_inline));
 static inline void ltr(uint16_t sel) __attribute__((always_inline));
 
+// read from I/O device to %eax
 static inline uint8_t
 inb(uint16_t port) {
     uint8_t data;
@@ -42,6 +43,39 @@ inb(uint16_t port) {
     return data;
 }
 
+/**
+ * The function transfers string from port(like I/O disk) specified DX register(@param port)
+ * to the memory byte pointed by ES:destination index. destination index is specified
+ * by EDI register (@param addr)
+ *
+ * Clear DF; DF = 0
+ *
+ * https://c9x.me/x86/html/file_module_x86_id_279.html
+ * https://www.aldeid.com/wiki/X86-assembly/Instructions/repne
+ * repne PREFIX can be added to INS instruction.
+ * Repeats a string instruction the number of times specified in the count register ((E)CX)
+ * or until the indicated condition of the ZF flag is no longer met.
+ * while(ecx != 0) // ecx is cnt <= both input and output
+ * {
+ * 		ZF = (al == *(BYTE *)edi);
+ * 		if(DF == 0) edi++; // edi is set by "=D"(addr), also it's both output/input.
+ * 		else edi--;
+ * 		ecx--;
+ * 		if(ZF) break;
+ * 	}
+ *
+ * 	https://docs.oracle.com/cd/E19455-01/806-3773/instructionset-6/index.html
+ * 	INS instruction transfers a string from a port specified in the DX register ("d"(port) below)
+ * 	to the memory byte or word pointed to by the ES:destination index.
+ * 	Load the desired port number into the DX register and the desired destination address
+ * 	into the DI or EDI index register("=D"(addr) below) before executing the ins instruction.
+ * 	After a transfer occurs, the destination-index register is automatically incremented or decremented
+ * 	as determined by the value of the direction flag (DF).
+ * 	The index register is incremented if DF = 0 (DF cleared by a cld instruction);
+ * 	it is decremented if DF = 1 (DF set by a std instruction).
+ * 	The increment or decrement count is 1 for a byte transfer, 2 for a word, and 4 for a long.
+ * 	Use the rep prefix with the ins instruction for a block transfer of CX bytes or words.
+ * */
 static inline void
 insl(uint32_t port, void *addr, int cnt) {
     asm volatile (
@@ -49,7 +83,8 @@ insl(uint32_t port, void *addr, int cnt) {
             "repne; insl;"
             : "=D" (addr), "=c" (cnt)
             : "d" (port), "0" (addr), "1" (cnt)
-            : "memory", "cc");
+            : "memory", "cc"); // This is to inform gcc that we will use and modify them ourselves.
+    // So gcc will not assume that the values it loads into these registers will be valid.
 }
 
 static inline void
