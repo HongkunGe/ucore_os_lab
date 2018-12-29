@@ -18,6 +18,8 @@ $(info [function] listf_print $(__info__print__))
 endef
 
 # get .o obj files: (#files[, packet])
+#  toobj boot,bootasm bootmain
+# ==>> obj/boot/bootasm.o obj/boot/bootmain.o
 toobj = $(addprefix $(OBJDIR)$(SLASH)$(if $(2),$(2)$(SLASH)),\
 		$(addsuffix .o,$(basename $(1))))
 
@@ -29,14 +31,23 @@ totarget = $(addprefix $(BINDIR)$(SLASH),$(1))
 # change $(name) to $(OBJPREFIX)$(name): (#names)
 packetname = $(if $(1),$(addprefix $(OBJPREFIX),$(1)),$(OBJPREFIX))
 
+# target is obj files and dependency files
+# $$(call todep,$(1),$(4)) ==>> generate dependency file
+# $$(call toobj,$(1),$(4)) ==>> generate object file
 # cc compile template, generate rule for dep, obj: (file, cc[, flags, dir])
+# https://blog.csdn.net/linuxandroidwince/article/details/75221300  << MT MM
 define cc_template
-$(info [function] cc_template todep $(call todep,$(1),$(4)))
-$(info [function] cc_template toobj $(call toobj,$(1),$(4)))
+# $(info [function] cc_template todep $(call todep,$(1),$(4)))
+# $(info [function] cc_template toobj $(call toobj,$(1),$(4)))
+# $(info [four dollar] $$$$(dir $$$$@))
+# | order-only prerequisites
+# impose a specific ordering on the rules to be invoked
+# without forcing the target to be updated if one of those rules is executed.
+# $$< the first prerequisite in the first rule for this target
 $$(call todep,$(1),$(4)): $(1) | $$$$(dir $$$$@)
-	@$(2) -I$$(dir $(1)) $(3) -MM $$< -MT "$$(patsubst %.d,%.o,$$@) $$@"> $$@
+	$(V)$(2) -I$$(dir $(1)) $(3) -MM $$< -MT "$$(patsubst %.d,%.o,$$@) $$@"> $$@
 $$(call toobj,$(1),$(4)): $(1) | $$$$(dir $$$$@)
-	@echo + cc $$<
+	$(V)echo + cc $$<
 	$(V)$(2) -I$$(dir $(1)) $(3) -c $$< -o $$@
 ALLOBJS += $$(call toobj,$(1),$(4))
 endef
@@ -44,20 +55,22 @@ endef
 # compile file: (#files, cc[, flags, dir])
 define do_cc_compile
 $$(foreach f,$(1),$$(eval $$(call cc_template,$$(f),$(2),$(3),$(4))))
-$$(foreach f,$(1),$$(info [function] do_cc_compile $$(call cc_template,$$(f),$(2),$(3),$(4))))
 endef
 
 # add files to packet: (#files, cc[, flags, packet, dir])
 define do_add_files_to_packet
+# $4=filename: __objs_filename else __objs_
 __temp_packet__ := $(call packetname,$(4))
+# if $$(origin $$(__temp_packet__)) is equal to undefined
+# origin tells you where it came from. fron ENV? file? default?
 ifeq ($$(origin $$(__temp_packet__)),undefined)
 $$(__temp_packet__) :=
 endif
 __temp_objs__ := $(call toobj,$(1),$(5))
 $$(foreach f,$(1),$$(eval $$(call cc_template,$$(f),$(2),$(3),$(5))))
 $$(__temp_packet__) += $$(__temp_objs__)
-$(info [function] do_add_files_to_packet __temp_packet__ $(__temp_packet__))
-$(info [function] do_add_files_to_packet __temp_packet__ $($(__temp_packet__))) # Question: why is this deferred?
+#$(info [function] do_add_files_to_packet __temp_packet__ $(__temp_packet__))
+#$(info [function] do_add_files_to_packet __temp_packet__ $($(__temp_packet__))) # Question: why is this deferred?
 endef
 
 # add objs to packet: (#objs, packet)
@@ -71,6 +84,8 @@ $(info [function] do_add_objs_to_packet __temp_packet__ $(__temp_packet__))
 endef
 
 # add packets and objs to target (target, #packes, #objs[, cc, flags])
+# $$^ and $$+ evaluate to the list of all prerequisites of rules that have already appeared for the same target
+# ($$+ with repetitions and $$^ without)
 define do_create_target
 __temp_target__ = $(call totarget,$(1))
 __temp_objs__ = $$(foreach p,$(call packetname,$(2)),$$($$(p))) $(3)
@@ -94,7 +109,7 @@ endef
 define do_finish_all
 ALLDEPS = $$(ALLOBJS:.o=.d)
 $$(sort $$(dir $$(ALLOBJS)) $(BINDIR)$(SLASH) $(OBJDIR)$(SLASH)):
-	@$(MKDIR) $$@
+	$(V)$(MKDIR) $$@
 endef
 
 # --------------------  function end  --------------------

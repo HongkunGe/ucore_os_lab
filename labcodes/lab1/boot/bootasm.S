@@ -59,6 +59,8 @@ seta20.2:
     # https://en.wikibooks.org/wiki/X86_Assembly/Global_Descriptor_Table
     # Load GDT, gdtdesc is a pointer to 6 bytes of memory containing the desired GDTR value.
     # 0-15 is LIMIT; 16-47 is BASE.
+    # https://en.wikipedia.org/wiki/Control_register see CR0 0th bit is PE.
+    # If 1, system is in protected mode, else system is in real mode
     lgdt gdtdesc
     movl %cr0, %eax
     orl $CR0_PE_ON, %eax  #ENABLE protected mode by setting PE flag.
@@ -67,6 +69,8 @@ seta20.2:
     # The functionality of CS segment register is largely changed after entering protection mode. Before that, CS serves
     # as a base address(CS * 16 + IP). After that, it is a segment selector, which's used as an index of GDT.
     # ljmp must be executed right after mov, to change CS register to the selector.
+    # ljmp的含义是长跳，长跳主要就是重新加载寄存器，32位保护模式主要体现在段寄存器，具有可以参考段选择子和段描述符的概念，
+    # 如果不用长跳的话，那么段寄存器不会重新加载，后面的取指结果仍然是老段寄存器中的值，当然保护模式不会生效了
     # https://piazza.com/class/i5j09fnsl7k5x0?cid=777
 
     # Jump to next instruction, but in 32-bit code segment. Now only assembly that
@@ -75,11 +79,19 @@ seta20.2:
     # $PROT_MODE_CSEG is provided for CS register, while $protcseg is for EIP.
     # http://csiflabs.cs.ucdavis.edu/~ssdavis/50/att-syntax.htm
     # https://docs.oracle.com/cd/E19455-01/806-3773/instructionset-73/index.html
+    # jmp far to a different code segment using segment-offset pointer. CS segment + $protcseg(offset)
     ljmp $PROT_MODE_CSEG, $protcseg
-
+    # ^^ understand this command!!!
+    # $PROT_MODE_CSEG is 0x8 serving as index of GDT, 0x8 will be put in the CS register.
+    # CPU will compute the address using GDT.at(0x8 * 1bytes) + EIP(offset); note we we read the descriptor from GDT at(0x8 * 1bytes);
+    # We fetch the base address from the descriptor, 0x0. suppose $protcseg is 0x7c32. So ljmp jumps to 0x7c32.
+    ## if GDT have N descriptors, this GDT will take space of 8N bytes. Start base is gdt_base, the end address will be gdt_base + 8N -1.
+    # GDTR(48 bits) segment limit use byte as unit. high 32 bits is gdt_base, base of GDT. low 16 bits is used as the segment limit, using byte as unit.
 .code32                                             # Assemble for 32-bit mode
 protcseg:
     # Set up the protected-mode data segment registers
+    # initialize all segment registers with PROT_MODE_DSEG(0x10). They all point to segment descriptor in GDT at 0x10(data segment descriptor).
+    # why could they point to data segment descriptor? b/c it's determined by the segmentation machinasm in https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-1/protect_mode.html.
     # Item 6. https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-1/real_mode_switch_protect_mode.html
     movw $PROT_MODE_DSEG, %ax                       # Our data segment selector
     movw %ax, %ds                                   # -> DS: Data Segment
@@ -98,6 +110,9 @@ spin:
     jmp spin
 
 # Bootstrap GDT
+# https://stackoverflow.com/questions/21546946/what-does-p2align-do-in-asm-code
+# https://sourceware.org/binutils/docs/as/P2align.html#P2align
+# Each segment descriptor takes 8 bytes.
 .p2align 2                                          # force 4 byte alignment
 gdt:
     SEG_NULLASM                                     # null seg

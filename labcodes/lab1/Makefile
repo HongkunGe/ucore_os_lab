@@ -3,7 +3,7 @@ EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 SLASH	:= /
 
-V       := @
+V       :=
 #need llvm/cang-3.5+
 #USELLVM := 1
 # try to infer the correct GCCPREFX
@@ -85,6 +85,8 @@ ALLDEPS	:=
 TARGETS	:=
 
 include tools/function.mk
+$(info GCCPREFIX $(GCCPREFIX))
+$(info LDFLAGS $(LDFLAGS))
 
 $(info [genral] ====== define util function =======)
 # find all files in $(1) with type c oR S.
@@ -118,9 +120,24 @@ CFLAGS	+= $(addprefix -I,$(INCLUDE))
 LIBDIR	+= libs
 
 $(info [genral] listf_cc $(call listf_cc,$(LIBDIR)))
+# [genral] listf_cc libs/string.c libs/printfmt.c
+#what's MM MT?
+# An -MT option will set the target to be exactly the string you specify.
+#mkdir -p obj/libs/
+#gcc -Ilibs/ -fno-builtin -Wall -ggdb -m32 -gstabs -nostdinc  -fno-stack-protector -Ilibs/  -MM libs/printfmt.c -MT "obj/libs/printfmt.o obj/libs/printfmt.d"> obj/libs/printfmt.d
+#gcc -Ilibs/ -fno-builtin -Wall -ggdb -m32 -gstabs -nostdinc  -fno-stack-protector -Ilibs/  -MM libs/string.c -MT "obj/libs/string.o obj/libs/string.d"> obj/libs/string.d
+
+#echo + cc libs/string.c
+#+ cc libs/string.c
+#gcc -Ilibs/ -fno-builtin -Wall -ggdb -m32 -gstabs -nostdinc  -fno-stack-protector -Ilibs/  -c libs/string.c -o obj/libs/string.o
+#echo + cc libs/printfmt.c
+#+ cc libs/printfmt.c
+#gcc -Ilibs/ -fno-builtin -Wall -ggdb -m32 -gstabs -nostdinc  -fno-stack-protector -Ilibs/  -c libs/printfmt.c -o obj/libs/printfmt.o
+
 # compile c files in ./libs directory to related objects.
 # add to ALLOBJS
-$(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)  
+$(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
+
 $(call target_print)
 $(info [genral] ====== compile libs folder end =======)
 
@@ -152,15 +169,16 @@ $(info [genral] KOBJS $(KOBJS))
 
 # create kernel target bin/kernel
 kernel = $(call totarget,kernel)
+# kernel=bin/kernel
 $(info [genral] kernel $(kernel))
 
 $(kernel): tools/kernel.ld
 
 $(kernel): $(KOBJS)
-	@echo + ld $@
+	$(V)echo + ld $@
 	$(V)$(LD) $(LDFLAGS) -T tools/kernel.ld -o $@ $(KOBJS)
-	@$(OBJDUMP) -S $@ > $(call asmfile,kernel)
-	@$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel)
+	$(V)$(OBJDUMP) -S $@ > $(call asmfile,kernel)
+	$(V)$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel)
 
 # compile the target bin/kernel
 # add bin/kernel to TARGET
@@ -171,19 +189,22 @@ $(info [genral] ====== compile kern folder end =======)
 # -------------------------------------------------------------------
 # create bootblock
 #TODO: understand this.
-$(info [genral] ====== compile boot folder =======)
+$(info [general] ====== compile boot folder =======)
 bootfiles = $(call listf_cc,boot)
+$(info [general] compile bootfiles $(bootfiles))
 $(foreach f,$(bootfiles),$(call cc_compile,$(f),$(CC),$(CFLAGS) -Os -nostdinc))
 
 bootblock = $(call totarget,bootblock)
-
+$(info [general] generating target bootblock $(bootblock))
+# -Ttext Locate a section in the output file at the absolute address given by org.
 $(bootblock): $(call toobj,$(bootfiles)) | $(call totarget,sign)
-	@echo + ld $@
+	$(V)echo + ld $@
 	$(V)$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 $^ -o $(call toobj,bootblock)
-	@$(OBJDUMP) -S $(call objfile,bootblock) > $(call asmfile,bootblock)
-	@$(OBJCOPY) -S -O binary $(call objfile,bootblock) $(call outfile,bootblock)
-	@$(call totarget,sign) $(call outfile,bootblock) $(bootblock)
-
+	$(V)$(OBJDUMP) -S $(call objfile,bootblock) > $(call asmfile,bootblock)
+	$(V)$(OBJCOPY) -S -O binary $(call objfile,bootblock) $(call outfile,bootblock)
+	$(V)$(call totarget,sign) $(call outfile,bootblock) $(bootblock)
+# echo + ld bin/bootblock
+# ld bin/bootblock
 $(call create_target,bootblock)
 $(call target_print)
 $(info [genral] ====== compile boot folder end =======)
@@ -191,6 +212,8 @@ $(info [genral] ====== compile boot folder end =======)
 # create 'sign' tools
 
 $(info [genral] ====== compile tools folder sign =======)
+# mkdir -p obj/sign/tools/
+# gcc -Itools/ -g -Wall -O2 -MM tools/sign.c -MT "obj/sign/tools/sign.o obj/sign/tools/sign.d"> obj/sign/tools/sign.d
 $(call add_files_host,tools/sign.c,sign,sign)
 $(call create_target_host,sign,sign)
 $(call target_print)
