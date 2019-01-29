@@ -85,10 +85,10 @@ ALLDEPS	:=
 TARGETS	:=
 
 include tools/function.mk
-$(info GCCPREFIX $(GCCPREFIX))
-$(info LDFLAGS $(LDFLAGS))
+# $(info GCCPREFIX $(GCCPREFIX))
+# $(info LDFLAGS $(LDFLAGS))
 
-$(info [genral] ====== define util function =======)
+# $(info [genral] ====== define util function =======)
 # find all files in $(1) with type c oR S.
 listf_cc = $(call listf,$(1),$(CTYPE))
 
@@ -109,17 +109,17 @@ symfile = $(call cgtype,$(call toobj,$(1)),o,sym)
 # for match pattern
 match = $(shell echo $(2) | $(AWK) '{for(i=1;i<=NF;i++){if(match("$(1)","^"$$(i)"$$")){exit 1;}}}'; echo $$?)
 
-$(info [genral] ====== define util function end =======)
+# $(info [genral] ====== define util function end =======)
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # include kernel/user
-$(info [genral] ====== compile libs folder =======)
+# $(info [genral] ====== compile libs folder =======)
 INCLUDE	+= libs/
 
 CFLAGS	+= $(addprefix -I,$(INCLUDE))
 LIBDIR	+= libs
 
-$(info [genral] listf_cc $(call listf_cc,$(LIBDIR)))
+# $(info [genral] listf_cc $(call listf_cc,$(LIBDIR)))
 # [genral] listf_cc libs/string.c libs/printfmt.c
 #what's MM MT?
 # An -MT option will set the target to be exactly the string you specify.
@@ -138,12 +138,12 @@ $(info [genral] listf_cc $(call listf_cc,$(LIBDIR)))
 # add to ALLOBJS
 $(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
 
-$(call target_print)
-$(info [genral] ====== compile libs folder end =======)
+# $(call target_print)
+# $(info [genral] ====== compile libs folder end =======)
 
 # -------------------------------------------------------------------
 # kernel
-$(info [genral] ====== compile kern folder =======)
+# $(info [genral] ====== compile kern folder =======)
 KINCLUDE	+= kern/debug/ \
 			   kern/driver/ \
 			   kern/trap/ \
@@ -160,17 +160,17 @@ KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
 # compile kern directory to __objs_kernel object
 $(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
-$(call target_print)
+# $(call target_print)
 
 # iterate over 'kernel libs' to expand nested variable references to get all object files.
 # https://www.gnu.org/software/make/manual/make.html#Computed-Names
 KOBJS	= $(call read_packet,kernel libs)
-$(info [genral] KOBJS $(KOBJS))
+# $(info [genral] KOBJS $(KOBJS))
 
 # create kernel target bin/kernel
 kernel = $(call totarget,kernel)
 # kernel=bin/kernel
-$(info [genral] kernel $(kernel))
+# $(info [genral] kernel $(kernel))
 
 $(kernel): tools/kernel.ld
 
@@ -183,19 +183,19 @@ $(kernel): $(KOBJS)
 # compile the target bin/kernel
 # add bin/kernel to TARGET
 $(call create_target,kernel)
-$(call target_print)
-$(info [genral] ====== compile kern folder end =======)
+# $(call target_print)
+# $(info [genral] ====== compile kern folder end =======)
 
 # -------------------------------------------------------------------
 # create bootblock
 #TODO: understand this.
-$(info [general] ====== compile boot folder =======)
+# $(info [general] ====== compile boot folder =======)
 bootfiles = $(call listf_cc,boot)
-$(info [general] compile bootfiles $(bootfiles))
+# $(info [general] compile bootfiles $(bootfiles))
 $(foreach f,$(bootfiles),$(call cc_compile,$(f),$(CC),$(CFLAGS) -Os -nostdinc))
 
 bootblock = $(call totarget,bootblock)
-$(info [general] generating target bootblock $(bootblock))
+# $(info [general] generating target bootblock $(bootblock))
 # -Ttext Locate a section in the output file at the absolute address given by org.
 $(bootblock): $(call toobj,$(bootfiles)) | $(call totarget,sign)
 	$(V)echo + ld $@
@@ -206,24 +206,24 @@ $(bootblock): $(call toobj,$(bootfiles)) | $(call totarget,sign)
 # echo + ld bin/bootblock
 # ld bin/bootblock
 $(call create_target,bootblock)
-$(call target_print)
-$(info [genral] ====== compile boot folder end =======)
+# $(call target_print)
+# $(info [genral] ====== compile boot folder end =======)
 # -------------------------------------------------------------------
 # create 'sign' tools
 
-$(info [genral] ====== compile tools folder sign =======)
+# $(info [genral] ====== compile tools folder sign =======)
 # mkdir -p obj/sign/tools/
 # gcc -Itools/ -g -Wall -O2 -MM tools/sign.c -MT "obj/sign/tools/sign.o obj/sign/tools/sign.d"> obj/sign/tools/sign.d
 $(call add_files_host,tools/sign.c,sign,sign)
 $(call create_target_host,sign,sign)
-$(call target_print)
-$(info [genral] ====== compile tools folder sign end =======)
+# $(call target_print)
+# $(info [genral] ====== compile tools folder sign end =======)
 
 # -------------------------------------------------------------------
 
 # create ucore.img
 UCOREIMG	:= $(call totarget,ucore.img)
-$(info [genral] UCOREIMG $(UCOREIMG): $(kernel) $(bootblock))
+# $(info [genral] UCOREIMG $(UCOREIMG): $(kernel) $(bootblock))
 
 $(UCOREIMG): $(kernel) $(bootblock)
 	$(V)dd if=/dev/zero of=$@ count=10000
@@ -231,7 +231,7 @@ $(UCOREIMG): $(kernel) $(bootblock)
 	$(V)dd if=$(kernel) of=$@ seek=1 conv=notrunc
 
 $(call create_target,ucore.img)
-$(call target_print)
+# $(call target_print)
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 $(call finish_all)
