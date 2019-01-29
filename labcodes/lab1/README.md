@@ -23,3 +23,22 @@ The functionality of CS segment register is largely changed after entering prote
 ljmp $PROT_MODE_CSEG, $protcseg will assign segment selector(0x08, which index to the 2nd descriptor of GDT mentioned above) to code segment register and assign $protcseg(offset, understand it as the code block start, which is added to base address) for EIP.
 Now we can execute the assembly code indicated by $protcseg, which sets up protect-mode data segment registers.
 Finally, initialize %ebp to be 0 and set stack pointer %esp to be start(0x7c00) and call into C(bootmain). 
+
+[Practice 5]
+Reference https://stackoverflow.com/questions/3699283/what-is-stack-frame-in-assembly?noredirect=1&lq=1
+The last line of stackframe
+```asm
+ebp:0x00007bf8 eip:0x00007d6e args:0xc031fcfa 0xc08ed88e 0x64e4d08e 0xfa7502a8 
+    <unknow>: -- 0x00007d6d --
+```
+1. why 7bf8? 
+ebp is 0x0 and esp is 0x7c00 initially. Checking bookblock.asm. 
+The first function call happens when bootloader call bootmain.c
+So return address(4bytes 32bit) and ebp[0x0x] (4bytes 32bit) is pushed, now esp is 0x7c00-8, 0x7bf8(decreasing growth).
+Then esp 0x7bf8 is assigned to ebp. So ebp contains 7bf8 at the last line. 
+2. 0xc031fcfa is the starts of bootblock.asm. fa fc 31 c0
+
+[Practice 6]
+
+1. 中断描述符表（也可简称为保护模式下的中断向量表）中一个表项占多少字节？其中哪几位代表中断处理代码的入口？
+8bytes in total. 16-31 of the gate descriptor is the selector of Interrupt Service Routine.

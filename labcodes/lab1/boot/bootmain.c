@@ -86,6 +86,9 @@ readseg(uintptr_t va, uint32_t count, uint32_t offset) {
 void
 bootmain(void) {
     // read the 1st page off disk
+    // https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-1/load_run_ucore.html
+    // Read the continous 8 sectors right after Master Boot Sector(Master Boot Record, MBR)
+    // 512 bytes as a sector. 8 sectors = 4K bytes.
     readseg((uintptr_t)ELFHDR, SECTSIZE * 8, 0);
 
     // is this a valid ELF?
@@ -96,6 +99,7 @@ bootmain(void) {
     struct proghdr *ph, *eph;
 
     // load each program segment (ignores ph flags)
+
     ph = (struct proghdr *)((uintptr_t)ELFHDR + ELFHDR->e_phoff);
     // ph is a pointer of proghdr(program header). Addition of pointer variable actually
     // works in terms of pointer based type, proghdr in this case.

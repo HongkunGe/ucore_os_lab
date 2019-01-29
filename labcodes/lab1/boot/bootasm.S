@@ -1,5 +1,6 @@
 #include <asm.h>
 
+# This is part 1 of boot loader
 # Start the CPU: switch to 32-bit protected mode, jump into C.
 # The BIOS loads this code from the first sector of the hard disk into
 # memory at physical address 0x7c00 and starts executing in real mode

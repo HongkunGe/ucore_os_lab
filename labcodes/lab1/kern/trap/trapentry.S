@@ -13,11 +13,14 @@ __alltraps:
     pushal
 
     # load GD_KDATA into %ds and %es to set up data segments for kernel
+    # Why GD_KDATA ? What's this for?
     movl $GD_KDATA, %eax
     movw %ax, %ds
     movw %ax, %es
 
     # push %esp to pass a pointer to the trapframe as an argument to trap()
+    # Why pushing esp passes a pointer of trapframe as argu to trap()???
+    # addr calc by ss:ebp stores old ebp; ss:ebp+1 return addr; ss:ebp+2 argu. should be so.
     pushl %esp
 
     # call trap(tf), where tf=%esp

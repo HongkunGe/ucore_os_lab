@@ -69,10 +69,10 @@ struct trapframe {
     uint16_t tf_padding2;
     uint16_t tf_ds;
     uint16_t tf_padding3;
-    uint32_t tf_trapno;
+    uint32_t tf_trapno;// pushed by vectors.S
     /* below here defined by x86 hardware */
-    uint32_t tf_err;
-    uintptr_t tf_eip;
+    uint32_t tf_err;  // pushed by vectors.S
+    uintptr_t tf_eip; // pushed by hardware
     uint16_t tf_cs;
     uint16_t tf_padding4;
     uint32_t tf_eflags;

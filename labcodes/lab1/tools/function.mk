@@ -14,7 +14,7 @@ listf = $(filter $(if $(2),$(addprefix %.,$(2)),%),\
 
 define do_listf_print
 __info__print__ := $(call listf,$(1),$(2))
-$(info [function] listf_print $(__info__print__))
+# $(info [function] listf_print $(__info__print__))
 endef
 
 # get .o obj files: (#files[, packet])
@@ -37,9 +37,6 @@ packetname = $(if $(1),$(addprefix $(OBJPREFIX),$(1)),$(OBJPREFIX))
 # cc compile template, generate rule for dep, obj: (file, cc[, flags, dir])
 # https://blog.csdn.net/linuxandroidwince/article/details/75221300  << MT MM
 define cc_template
-# $(info [function] cc_template todep $(call todep,$(1),$(4)))
-# $(info [function] cc_template toobj $(call toobj,$(1),$(4)))
-# $(info [four dollar] $$$$(dir $$$$@))
 # | order-only prerequisites
 # impose a specific ordering on the rules to be invoked
 # without forcing the target to be updated if one of those rules is executed.
@@ -69,8 +66,6 @@ endif
 __temp_objs__ := $(call toobj,$(1),$(5))
 $$(foreach f,$(1),$$(eval $$(call cc_template,$$(f),$(2),$(3),$(5))))
 $$(__temp_packet__) += $$(__temp_objs__)
-#$(info [function] do_add_files_to_packet __temp_packet__ $(__temp_packet__))
-#$(info [function] do_add_files_to_packet __temp_packet__ $($(__temp_packet__))) # Question: why is this deferred?
 endef
 
 # add objs to packet: (#objs, packet)
@@ -80,7 +75,7 @@ ifeq ($$(origin $$(__temp_packet__)),undefined)
 $$(__temp_packet__) :=
 endif
 $$(__temp_packet__) += $(1)
-$(info [function] do_add_objs_to_packet __temp_packet__ $(__temp_packet__))
+# $(info [function] do_add_objs_to_packet __temp_packet__ $(__temp_packet__))
 endef
 
 # add packets and objs to target (target, #packes, #objs[, cc, flags])
@@ -99,11 +94,11 @@ endif
 endef
 
 define do_print_target_info
-$(info [function] do_print_target_info __temp_packet__  $(__temp_packet__))
-$(info [function] do_print_target_info __temp_target__  $(__temp_target__))
-$(info [function] do_print_target_info __temp_objs__ $(__temp_objs__))
-$(info [function] do_print_target_info TARGETS $(TARGETS))
-$(info [function] do_print_target_info ALLOBJS $(ALLOBJS))
+#$(info [function] do_print_target_info __temp_packet__  $(__temp_packet__))
+#$(info [function] do_print_target_info __temp_target__  $(__temp_target__))
+#$(info [function] do_print_target_info __temp_objs__ $(__temp_objs__))
+#$(info [function] do_print_target_info TARGETS $(TARGETS))
+#$(info [function] do_print_target_info ALLOBJS $(ALLOBJS))
 endef
 # finish all
 define do_finish_all

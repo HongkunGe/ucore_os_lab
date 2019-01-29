@@ -47,6 +47,7 @@
 #define STS_TG32        0xF            // 32-bit Trap Gate
 
 /* Gate descriptors for interrupts and traps */
+// https://stackoverflow.com/questions/3186008/in-c-what-does-a-colon-mean-inside-a-declaration
 struct gatedesc {
     unsigned gd_off_15_0 : 16;        // low 16 bits of offset in segment
     unsigned gd_ss : 16;            // segment selector
