@@ -42,3 +42,12 @@ Then esp 0x7bf8 is assigned to ebp. So ebp contains 7bf8 at the last line.
 
 1. 中断描述符表（也可简称为保护模式下的中断向量表）中一个表项占多少字节？其中哪几位代表中断处理代码的入口？
 8bytes in total. 16-31 of the gate descriptor is the selector of Interrupt Service Routine.
+
+[Extended Practice]
+
+1. References https://github.com/twd2/ucore_os_lab/tree/master/labcodes/lab1
+ https://piazza.com/class/i5j09fnsl7k5x0?cid=122
+ https://piazza.com/class/i5j09fnsl7k5x0?cid=127
+ inline assembly
+ https://www.ibm.com/developerworks/library/l-ia/index.html
+ https://www.ibm.com/developerworks/cn/linux/sdk/assemble/inline/index.html

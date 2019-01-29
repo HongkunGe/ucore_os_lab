@@ -233,6 +233,8 @@ trap_dispatch(struct trapframe *tf) {
         if( c == '3' || c == '0' || c == 'p')
             print_trapframe(tf);
         cprintf("kbd [%03d] %c\n", c, c);
+        // TODO: this doesn't work. Need to figure out why???
+        // TODO: Chalenge 2
         if(c == '3' && trap_in_kernel(tf))
             lab1_switch_to_user();
         if(c == '0' && !trap_in_kernel(tf))
