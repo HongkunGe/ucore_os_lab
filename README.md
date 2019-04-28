@@ -4,7 +4,10 @@ ucore os labs was used as OS Experiments in OS Course Of Dept. of Computer Scien
 
 NEWS
 ====
-- 2018.04.03：ucore os labs were ported on RISC-V(64bit) CPU（privileged arch spec 1.10). You can access [repo's riscv64-priv-1.10 branch](https://github.com/chyyuu/ucore_os_lab/tree/riscv64-priv-1.10). Thanks  Zhengxing Shi's great work!
+- 2019.03.01: [step_by_step rcore os labs from scratch](https://github.com/LearningOS/rcore_step_by_step) is in progress. Thanks Qingling Pan, Fengyuan Liu's great work!
+- 2019.01.19: [rcore os labs(pre-alpha version)](https://github.com/oscourse-tsinghua/rcore_plus/tree/lab8-rv32) on RISC-V(32bit) were released. Thanks Runji Wang, Wei Zhang, Zhenyang Dai, Jiajie Chen, Yuekai Jia, Cheng Lu...'s great work!
+- 2019.01.19: [rcore os labs(pre-pre-alpha version)](https://github.com/oscourse-tsinghua/rcore_plus/tree/lab8-aarch64) on Raspberry Pi(AARCH 64bit) were released. Thanks Yuekai Jia, Runji Wang, Jiajie Chen...'s great work!
+- 2018.04.03：ucore os labs were ported on RISC-V(64bit) CPU（privileged arch spec 1.10). You can access [repo's riscv64-priv-1.10 branch](https://github.com/chyyuu/ucore_os_lab/tree/riscv64-priv-1.10). Thanks Zhengxing Shi's great work!
 - 2018.03.18: Weixiao Huang provided https://github.com/weixiao-huang/silver-spoon to support os labs in docker environment on windows/macos/linux. [details](https://github.com/weixiao-huang/silver-spoon/tree/master/docs)
 - 2018.02.03：ucore os labs were ported on RISC-V(32bit) CPU（privileged arch spec 1.10). You can access [repo's riscv32-priv-1.10 branch](https://github.com/chyyuu/ucore_os_lab/tree/riscv32-priv-1.10). Thanks  Wei Zhang's great work!
 
@@ -14,9 +17,11 @@ MAINTAINERS
 OS course for Dept. CS. in Tsinghua Univ., and MOOC OS course
 -----------------------------------
 - Chen, Yu: yuchen@tsinghua.edu.cn http://soft.cs.tsinghua.edu.cn/~chen
-- Yong, Xiang: xyong@tsinghua.edu.cn
+- Xiang, Yong: xyong@tsinghua.edu.cn
 - Mao, Junjie: eternal.n08@gmail.com
 - Zhang, Wei: zhangwei15@mails.tsinghua.edu.cn
+- Wang, Runji: wangrunji0408@163.com 
+- Jia, Yuekai: jiayk15@mails.tsinghua.edu.cn
 
 CONTENTS
 ========
@@ -38,6 +43,7 @@ lab8: filesystem
 TESTED ENVIRONMENT
 ==================
 ```
+UBUNTU 16.04 x86-64: GCC-7.3 
 UBUNTU 14.04+: GCC-4.8.2+ CLANG-3.5+
 FEDORA 20+: GCC-4.8.2+
 ```
@@ -45,16 +51,16 @@ FEDORA 20+: GCC-4.8.2+
 EXERCISE STEPS
 ==============
 ```
-0 Get the newest os lab src codes/docs.(Insure you can connect to github in ubuntu running on VrtualBox)
-0.1 If you try to get all codes
+0 Get the newest os lab src code/docs.(Insure you can connect to github in ubuntu running on VrtualBox)
+0.1 If you try to get all code
   $rm -rf ucore_lab
   $git clone git://github.com/chyyuu/ucore_os_lab.git
   $cd ucore_lab
-0.2 If you gloned ucore_lab and only try to get the updated codes
+0.2 If you cloned ucore_lab and only try to get the updated code
   $cd ucore_os_lab
   $git pull
 1 $cd labX  
-2 read codes (specially the modified or added files)
+2 read code (specially the modified or added files)
 3 add your code
 4 compile your code
   $make
@@ -85,7 +91,7 @@ Master: Finish all OS labs in two month by yourself
 Veteran: Finish all OS labs in three month by yourself
 Apprentice: Finish all OS labs in one semester with other guy's help
 ```
- 
+
 RESOURCE REPOSITORY
 ===================
 ```
