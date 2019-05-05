@@ -153,6 +153,8 @@ struct Page *
 alloc_pages(size_t n) {
     struct Page *page=NULL;
     bool intr_flag;
+
+    // TODO: what is local_intr_save for?
     local_intr_save(intr_flag);
     {
         page = pmm_manager->alloc_pages(n);
@@ -239,6 +241,7 @@ page_init(void) {
     }
 }
 
+//TODO: where's the enable?
 //boot_map_segment - setup&enable the paging mechanism
 // parameters
 //  la:   linear address of this memory need to map (after x86 segment map)
@@ -275,6 +278,7 @@ boot_alloc_page(void) {
 void
 pmm_init(void) {
     // We've already enabled paging
+    // TODO: what's this for? boot_cr3 is not used?
     boot_cr3 = PADDR(boot_pgdir);
 
     //We need to alloc/free the physical memory (granularity is 4KB or other size). 
@@ -301,9 +305,14 @@ pmm_init(void) {
 
     // map all physical memory to linear memory with base linear addr KERNBASE
     // linear_addr KERNBASE ~ KERNBASE + KMEMSIZE = phy_addr 0 ~ KMEMSIZE
+    // Transitional period.
     boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);
 
+    // Before gdt_init, segment is not updated.
     // Since we are using bootloader's GDT,
+
+    // gdt_init <= pmm_init <= kern_init
+
     // we should reload gdt (second time, the last time) to get user segments and the TSS
     // map virtual_addr 0 ~ 4G = linear_addr 0 ~ 4G
     // then set kernel stack (ss:esp) in TSS, setup TSS in gdt, load TSS
@@ -348,7 +357,7 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
      *   PTE_U           0x004                   // page table/directory entry flags bit : User can access
      */
 #if 0
-    pde_t *pdep = NULL;   // (1) find page directory entry
+    alloc_pagepde_t *pdep = NULL;   // (1) find page directory entry
     if (0) {              // (2) check if entry is not present
                           // (3) check if creating is needed, then alloc page for page table
                           // CAUTION: this page is used for page table, not for common data page

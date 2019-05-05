@@ -95,7 +95,7 @@ bootmain(void) {
 
     struct proghdr *ph, *eph;
 
-    // load each program segment (ignores ph flags)
+    // load each program segment (ignores ph flags) TODO: what is ph for?
     ph = (struct proghdr *)((uintptr_t)ELFHDR + ELFHDR->e_phoff);
     eph = ph + ELFHDR->e_phnum;
     for (; ph < eph; ph ++) {
@@ -104,7 +104,12 @@ bootmain(void) {
 
     // call the entry point from the ELF header
     // note: does not return
-    ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))();
+    // ELFHDR->e_entry points to 0x00100000, a function pointer, which is kern_entry in this lab2 based on kernel.ld.
+    // https://piazza.com/class/i5j09fnsl7k5x0?cid=72 but it's for lab1.
+    // https://chyyuu.gitbooks.io/ucore_os_docs/content/lab2/lab2_3_3_5_4_maping_relations.html
+    // Until now it's in phase 1. which means
+    // virt addr = linear addr = phy addr
+    ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))(); // this is to cast a function pointer.
 
 bad:
     outw(0x8A00, 0x8A00);

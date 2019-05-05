@@ -46,6 +46,21 @@ idt_init(void) {
       *     You don't know the meaning of this instruction? just google it! and check the libs/x86.h to know more.
       *     Notice: the argument of lidt is idt_pd. try to find it!
       */
+    extern uintptr_t __vectors[];
+    for(int i = 0; i < 256; i++) {
+         if(i == T_SYSCALL) {
+             SETGATE(idt[i], /*not trap*/0, GD_KTEXT, __vectors[i], DPL_USER);
+         }
+         else if(i < IRQ_OFFSET) {
+             // System fault, trap and NMI are all handled as trap. IF flag is not cleared
+             // so maskable interruption is not disabled.
+             SETGATE(idt[i], /*trap*/1, GD_KTEXT, __vectors[i], DPL_KERNEL);
+         }
+         else {
+             SETGATE(idt[i], /*not trap*/0, GD_KTEXT, __vectors[i], DPL_KERNEL);
+         }
+    }
+    lidt(&idt_pd);
 }
 
 static const char *
@@ -147,6 +162,9 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
+        ticks ++;
+        if(ticks % TICK_NUM == 0)
+            print_ticks();
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
@@ -158,8 +176,48 @@ trap_dispatch(struct trapframe *tf) {
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
+        if (tf->tf_cs != USER_CS) {
+            //当前在内核态，需要建立切换到用户态所需的trapframe结构的数据switchk2u
+            //设置临时栈，指向switchk2u，这样iret返回时，CPU会从switchk2u恢复数据，而不是从现有栈恢复数据。
+            // 我猜测这是因为在进入中断时，是内核态进入内核态，因此 CPU 没有压入 esp 与 ss，
+            // 但在退出中断时，将从内核态返回用户态，原本的 trapframe 里并不包含 esp 与 ss，所以建立了一个临时的 trapframe
+
+            struct trapframe switchk2u = *tf; // a shallow copy
+
+            // iret doesn't change any of the data segments, so you will need to change them manually.
+            switchk2u.tf_ds = switchk2u.tf_es = switchk2u.tf_gs = switchk2u.tf_fs = USER_DS;
+            switchk2u.tf_cs = USER_CS;
+
+            // TODO: how to understand this? This will be esp in user mode. Why it's using the same addr as in kernel mode? Why this equation??
+            // But this should be just to set the esp inside user mode. based on the memory of kernel mode. //TODO: why can it be used by both??
+            switchk2u.tf_esp = (uint32_t) tf + sizeof(struct trapframe); // this will be %esp after going to user mode.
+            switchk2u.tf_ss = USER_DS;
+            //设置EFLAG的I/O特权位，使得在用户态可使用in/out指令
+            switchk2u.tf_eflags |= (3 << 12);
+
+            asm volatile (
+                "movl %0, %%esp \n" // change stack.
+                "jmp __trapret"
+                :
+                : "g"(&switchk2u) // https://gcc.gnu.org/onlinedocs/gcc/Simple-Constraints.html#Simple-Constraints
+            );
+        }
     case T_SWITCH_TOK:
-        panic("T_SWITCH_** ??\n");
+        if (tf->tf_cs != KERNEL_CS) {
+            struct trapframe *switchu2k = (struct trapframe *) (tf->tf_esp - sizeof(struct trapframe));// TODO:why? Check Line 221?
+            for (int i = 0; i < sizeof(struct trapframe) / sizeof(uint32_t); i++) // not copy last 2 * 4bytes. (esp ss)
+                ((uint32_t *) switchu2k)[i] = ((uint32_t *) tf)[i];
+            switchu2k->tf_gs = switchu2k->tf_fs = switchu2k->tf_es = switchu2k->tf_ds = KERNEL_DS;
+            switchu2k->tf_cs = KERNEL_CS;
+            switchu2k->tf_ss = KERNEL_DS;
+            switchu2k->tf_eflags &= ~(3 << 12);
+            asm volatile (
+                "movl %0, %%esp \n" // change stack.
+                "jmp __trapret \n"
+                :
+                : "g"(switchu2k) // https://gcc.gnu.org/onlinedocs/gcc/Simple-Constraints.html#Simple-Constraints
+            );
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:

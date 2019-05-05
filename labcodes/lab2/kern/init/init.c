@@ -28,6 +28,7 @@ kern_init(void) {
 
     grade_backtrace();
 
+    //TODO: this step has issue.
     pmm_init();                 // init physical memory management
 
     pic_init();                 // init interrupt controller
@@ -38,7 +39,8 @@ kern_init(void) {
 
     //LAB1: CAHLLENGE 1 If you try to do it, uncomment lab1_switch_test()
     // user/kernel mode switch test
-    //lab1_switch_test();
+    cprintf("lab1_switch_test....");
+    lab1_switch_test();
 
     /* do nothing */
     while (1);
@@ -85,11 +87,34 @@ lab1_print_cur_status(void) {
 static void
 lab1_switch_to_user(void) {
     //LAB1 CHALLENGE 1 : TODO
+    asm volatile (
+        "sub $0x8, %%esp \n" // subtract esp(stack pointer) by 0x8.(8bytes)
+        "int %0 \n" // after this line, we are in the user mode.
+        // "movl %%ebp, %%esp \n" // without -8 in trap.c L221. esp will be same as esp in kernel mode before going to ISR.
+        :
+        : "i" (T_SWITCH_TOU)
+    );
 }
 
 static void
 lab1_switch_to_kernel(void) {
     //LAB1 CHALLENGE 1 :  TODO
+    uint32_t reg1, reg2, reg3, reg4;
+    asm volatile (
+        "int %4 \n"
+        "movl %%ebp, %0 \n"
+        "movl %%esp, %1 \n"
+        "movl %%ebp, %%esp \n"
+        "movl %%ebp, %2 \n"
+        "movl %%esp, %3 \n"
+        : "=m"(reg1), "=m"(reg2), "=m"(reg3), "=m"(reg4)
+        : "i" (T_SWITCH_TOK)
+    );
+
+    cprintf(" = %x\n", reg1);
+    cprintf(" = %x\n", reg2);
+    cprintf(" = %x\n", reg3);
+    cprintf(" = %x\n", reg4);
 }
 
 static void

@@ -71,14 +71,17 @@ void print_pgdir(void);
             (void *) (__m_pa + KERNBASE);                               \
         })
 
+// All pages and number of pages.
 extern struct Page *pages;
 extern size_t npage;
 
+// index of the page?
 static inline ppn_t
 page2ppn(struct Page *page) {
     return page - pages;
 }
 
+// index of the page in PT&PDT? Physical address.
 static inline uintptr_t
 page2pa(struct Page *page) {
     return page2ppn(page) << PGSHIFT;

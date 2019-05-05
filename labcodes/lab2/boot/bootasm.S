@@ -43,6 +43,9 @@ seta20.2:
     movb $0xdf, %al                                 # 0xdf -> port 0x60
     outb %al, $0x60                                 # 0xdf = 11011111, means set P2's A20 bit(the 1 bit) to 1
 
+# Check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/phymem_analysis.html
+# Check https://chyyuu.gitbooks.io/ucore_os_docs/content/lab2/lab2_3_5_probe_phymem_methods.html
+# Check http://www.uruk.org/orig-grub/mem64mb.html
 probe_memory:
     movl $0, 0x8000
     xorl %ebx, %ebx
