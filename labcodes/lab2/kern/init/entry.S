@@ -67,10 +67,13 @@ bootstacktop:
 .align PGSIZE
 __boot_pgdir:
 .globl __boot_pgdir
+    # TODO: need to understand. why there're two mappings???
+    # I know this is used after paging is enabled. but how???
+    # 1st one is one-one mapping.
     # map va 0 ~ 4M to pa 0 ~ 4M (temporary)
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
-    .space (KERNBASE >> PGSHIFT >> 10 << 2) - (. - __boot_pgdir) # pad to PDE of KERNBASE
-    # map va KERNBASE + (0 ~ 4M) to pa 0 ~ 4M
+    .space (KERNBASE >> PGSHIFT >> 10 << 2) -    (. - __boot_pgdir) # pad to PDE of KERNBASE
+    # 2nd one is mapping va KERNBASE + (0 ~ 4M) to pa 0 ~ 4M
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
     .space PGSIZE - (. - __boot_pgdir) # pad to PGSIZE
 

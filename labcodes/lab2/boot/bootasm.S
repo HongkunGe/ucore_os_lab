@@ -46,6 +46,9 @@ seta20.2:
 # Check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/phymem_analysis.html
 # Check https://chyyuu.gitbooks.io/ucore_os_docs/content/lab2/lab2_3_5_probe_phymem_methods.html
 # Check http://www.uruk.org/orig-grub/mem64mb.html
+# 在0x8000地址处保存了从BIOS中获得的内存分布信息，此信息按照struct e820map的设置来进行填充。
+# 这部分信息将在bootloader启动ucore后，由ucore的page_init函数来根据struct e820map的memmap（定义了
+# 起始地址为0x8000）来完成对整个机器中的物理内存的总体管理。
 probe_memory:
     movl $0, 0x8000
     xorl %ebx, %ebx

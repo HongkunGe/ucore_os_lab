@@ -81,7 +81,15 @@ typedef uintptr_t pde_t;
 #define E820MAX             20      // number of entries in E820MAP
 #define E820_ARM            1       // address range memory
 #define E820_ARR            2       // address range reserved
-
+// https://en.wikipedia.org/wiki/E820
+// INT 15h, AX=E820h - Query System Address Map
+// Real mode only.
+// This call returns a memory map of all the installed RAM,
+// and of physical memory ranges reserved by the BIOS.
+// The address map is returned by making successive calls to this API,
+// each returning one "run" of physical address information.
+// Each run has a type which dictates how this run of physical
+// address range should be treated by the operating system.
 struct e820map {
     int nr_map;
     struct {

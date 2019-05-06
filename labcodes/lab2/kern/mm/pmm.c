@@ -188,9 +188,12 @@ nr_free_pages(void) {
     return ret;
 }
 
-/* pmm_init - initialize the physical memory management */
+/* pmm_init - initialize the physical memory management
+ * check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/implement_pages_mem_managment.html
+ * */
 static void
 page_init(void) {
+    // we stored memory mapping at 0x8000 (+KERNBASE => virtual memory address).
     struct e820map *memmap = (struct e820map *)(0x8000 + KERNBASE);
     uint64_t maxpa = 0;
 
@@ -201,24 +204,71 @@ page_init(void) {
         cprintf("  memory: %08llx, [%08llx, %08llx], type = %d.\n",
                 memmap->map[i].size, begin, end - 1, memmap->map[i].type);
         if (memmap->map[i].type == E820_ARM) {
+            // find the maximum physical memory addr
             if (maxpa < end && begin < KMEMSIZE) {
                 maxpa = end;
             }
         }
     }
+
+    // KMEMSIZE is the max physical mem
     if (maxpa > KMEMSIZE) {
         maxpa = KMEMSIZE;
     }
 
     extern char end[];
 
-    npage = maxpa / PGSIZE;
+    npage = maxpa / PGSIZE; // total num of pages and they are to be managed.
+    // `pages` is the address that end of uCore kernel images is rounded up to next page.(`end` is defined in kernel.ld).
     pages = (struct Page *)ROUNDUP((void *)end, PGSIZE);
 
+    /*
+     * 从地址0到地址pages+ sizeof(struct Page) npage)结束的物理内存空间设定
+     * 为已占用物理内存空间（起始0~640KB的空间是空闲的），
+     * 地址pages+ sizeof(struct Page) npage)以上的空间为空闲物理内存空间
+     * */
+    // set the bit for PG_reserved, the memory starting from `pages` is reserved for kernel.
+    // TODO: SetPageReserved is used to setbit for all the pages, right? Page struct covers both
+    // 1. 0 ~ pages + sizeof(struct Page) npage)
+    // 2. above pages + sizeof(struct Page) npage)
+    // pages ~ pages + npages : totally there're npage Page struct; they are ALL marked with `PG_reserved`.
+    // My understanding: starting from `pages` is space for memory management.
+    // inside the space, mark each of Page struct with `PG_reserved`.
+    //TODO: where is PDE and PTE???
     for (i = 0; i < npage; i ++) {
         SetPageReserved(pages + i);
-    }
+    } //
 
+    /* *
+ * Virtual memory map:                                          Permissions
+ *                                                              kernel/user
+ *
+ *     4G ------------------> +---------------------------------+
+ *                            |                                 |
+ *                            |         Empty Memory (*)        |
+ *                            |                                 |
+ *                            +---------------------------------+ 0xFB000000
+ *                            |   Cur. Page Table (Kern, RW)    | RW/-- PTSIZE
+ *     VPT -----------------> +---------------------------------+ 0xFAC00000
+ *                            |        Invalid Memory (*)       | --/--
+ *     KERNTOP -------------> +---------------------------------+ 0xF8000000 (PA:0x38000000)
+ *                            |                                 |
+ *                            |    Remapped Physical Memory     | RW/-- KMEMSIZE
+ *                            |                                 |
+ *     KERNBASE ------------> +---------------------------------+ 0xC0000000 (PA:0x00000000)
+ *                            |                                 |
+ *                            |                                 |
+ *                            |                                 |
+ *                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * (*) Note: The kernel ensures that "Invalid Memory" is *never* mapped.
+ *     "Empty Memory" is normally unmapped, but user programs may map pages
+ *     there if desired.
+ *
+ * */
+
+    // start of the free user space memory. TRUE!!
+    // sizeof(struct Page) : Page data structure size
+    // sizeof(struct Page) * npage : total size of memory space that we need to manage all the free memory space
     uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);
 
     for (i = 0; i < memmap->nr_map; i ++) {
