@@ -94,10 +94,7 @@
  *      Try to merge blocks at lower or higher addresses. Notice: This should
  *  change some pages' `p->property` correctly.
  */
-free_area_t free_area;
-
-#define free_list free_area.free_list
-#define nr_free free_area.nr_free
+free_area_t free_area; // automatic allocation. all fields are placed on stack.
 
 /**
  * `default_init` function to initialize the `free_list`
@@ -106,10 +103,8 @@ free_area_t free_area;
  * */
 static void
 default_init(void) {
-//    free_area.nr_free = 0;
-//    list_init(&(free_area.free_list));
-    list_init(&free_list);
-    nr_free = 0;
+    free_area.nr_free = 0;
+    list_init(&(free_area.free_list));
 }
 
 /**
@@ -119,8 +114,7 @@ default_init(void) {
  * member function of default_pmm_manager
  * CALL GRAPH: `kern_init` --> `pmm_init` --> `page_init` --> `init_memmap` -->
  * `pmm_manager` --> `init_memmap/default_init_memmap`.
- * This function is used to initialize a free block (with parameter `addr_base`,
- * `page_number`). In order to initialize a free block, firstly, you should
+ * In order to initialize a free block, firstly, you should
  * initialize each page (defined in memlayout.h) in this free block. This
  * procedure includes:
  *  - Setting the bit `PG_property` of `p->flags`, which means this page is
@@ -137,22 +131,139 @@ default_init(void) {
  * */
 static void
 default_init_memmap(struct Page *base, size_t n) {
+    assert(n > 0);
 
+    struct Page *page = base;
+    for(; page != base + n; page++) {
+        assert(PageReserved(page)); // make sure the page is reserved TODO: reserved is only for kernel, right? Isn't we use this for user space?
+        page->ref = 0; // no ref and is free.
+        page->property = 0; // not first page
+    }
+    base->property = n;
+    // if bit=1, the page is the head of page list.
+    // if bit=0, either the page is the head of mem block and the block is allocate
+    //           or the page is not head.  TODO: confirm.
+    SetPageProperty(base);
+    // why adding before? b/c free_list->next is the block with 1st address.
+    list_add_before(&(free_area.free_list), &(base->page_link));
+    free_area.nr_free += n;
 }
 
+/**
+ *  (4) `default_alloc_pages`:
+ *  Search for the first free block (block size >= n) in the free list and reszie
+ * the block found, returning the address of this block as the address required by
+ * `malloc`.
+ *  (4.1)
+ *      So you should search the free list like this:
+ *          list_entry_t le = &free_list;
+ *          while((le=list_next(le)) != &free_list) {
+ *          ...
+ *      (4.1.1)
+ *          In the while loop, get the struct `page` and check if `p->property`
+ *      (recording the num of free pages in this block) >= n.
+ *              struct Page *p = le2page(le, page_link);
+ *              if(p->property >= n){ ...
+ *      (4.1.2)
+ *          If we find this `p`, it means we've found a free block with its size
+ *      >= n, whose first `n` pages can be malloced. Some flag bits of this page
+ *      should be set as the following: `PG_reserved = 1`, `PG_property = 0`.
+ *      Then, unlink the pages from `free_list`.
+ *          (4.1.2.1)
+ *              If `p->property > n`, we should re-calculate number of the rest
+ *          pages of this free block. (e.g.: `le2page(le,page_link))->property
+ *          = p->property - n;`)
+ *          (4.1.3)
+ *              Re-caluclate `nr_free` (number of the the rest of all free block).
+ *          (4.1.4)
+ *              return `p`.
+ *      (4.2)
+ *          If we can not find a free block with its size >=n, then return NULL.
+ * */
 static struct Page *
 default_alloc_pages(size_t n) {
-
+    assert(n > 0);
+    if (n > free_area.nr_free) {
+        return NULL;
+    }
+    struct Page *p = NULL;
+    list_entry_t* le = &(free_area.free_list);
+    // the last element of the free_list points to the dummy head of free_list.
+    while ((le = list_next(le)) != &(free_area.free_list)) {
+        p = le2page(le, page_link);
+        if(p->property >= n) {
+            ClearPageProperty(p); // PG_property = 0
+            if(p->property > n) {
+                struct Page* nxt = p + n;
+                nxt->property = p->property - n;
+                SetPageProperty(nxt); // make it a valid head of a block
+                list_add_before(le, &(nxt->page_link)); // before after shouldn't matter
+            }
+            list_del(le); // ans: list_del(&(page->page_link)); same i think.
+            free_area.nr_free -= n;
+//            p->ref++; NOTE: shouldn't plus1 ref
+            break;
+        }
+    }
+    return p;
 }
 
+/**
+ *(5) `default_free_pages`:
+ *  re-link the pages into the free list, and may merge small free blocks into
+ * the big ones.
+ *  (5.1)
+ *      According to the base address of the withdrawed blocks, search the free
+ *  list for its correct position (with address from low to high), and insert
+ *  the pages. (May use `list_next`, `le2page`, `list_add_before`)
+ *  (5.2)
+ *      Reset the fields of the pages, such as `p->ref` and `p->flags` (PageProperty)
+ *  (5.3)
+ *      Try to merge blocks at lower or higher addresses. Notice: This should
+ *  change some pages' `p->property` correctly.
+ * */
 static void
 default_free_pages(struct Page *base, size_t n) {
-    
+    assert(n > 0);
+    // dummy header of all list_entry_t used to find all free blocks
+    list_entry_t* le = &(free_area.free_list);
+    while ((le = list_next(le)) != &(free_area.free_list)) {
+        struct Page* cur = le2page(le, page_link);
+        if (base < cur) {
+            break;
+        }
+    }
+    list_add_before(le, &(base->page_link));
+    base->property = n;
+    SetPageProperty(base);
+    base->ref = 0;
+    free_area.nr_free += n;
+
+    list_entry_t* nxt_entry = list_next(&(base->page_link));
+    if (nxt_entry != &(free_area.free_list)) {
+        struct Page* nxt = le2page(nxt_entry, page_link), *base_n = base + n;
+        if (base_n == nxt) {
+            base->property += nxt->property;
+            nxt->property = 0;
+            list_del(&(nxt->page_link));
+            ClearPageProperty(nxt);
+        }
+    }
+    list_entry_t* prv_entry = list_prev(&(base->page_link));
+    if (prv_entry != &(free_area.free_list)) {
+        struct Page* prv = le2page(prv_entry, page_link), *prv_n = prv + prv->property;
+        if (prv_n == base) {
+            prv->property += base->property;
+            base->property = 0;
+            list_del(&(base->page_link));
+            ClearPageProperty(base);
+        }
+    }
 }
 
 static size_t
 default_nr_free_pages(void) {
-    return nr_free;
+    return free_area.nr_free;
 }
 
 static void
@@ -170,19 +281,19 @@ basic_check(void) {
     assert(page2pa(p1) < npage * PGSIZE);
     assert(page2pa(p2) < npage * PGSIZE);
 
-    list_entry_t free_list_store = free_list;
-    list_init(&free_list);
-    assert(list_empty(&free_list));
+    list_entry_t free_list_store = free_area.free_list;
+    list_init(&(free_area.free_list));
+    assert(list_empty(&(free_area.free_list)));
 
-    unsigned int nr_free_store = nr_free;
-    nr_free = 0;
+    unsigned int nr_free_store = free_area.nr_free;
+    free_area.nr_free = 0;
 
     assert(alloc_page() == NULL);
 
     free_page(p0);
     free_page(p1);
     free_page(p2);
-    assert(nr_free == 3);
+    assert(free_area.nr_free == 3);
 
     assert((p0 = alloc_page()) != NULL);
     assert((p1 = alloc_page()) != NULL);
@@ -191,15 +302,15 @@ basic_check(void) {
     assert(alloc_page() == NULL);
 
     free_page(p0);
-    assert(!list_empty(&free_list));
+    assert(!list_empty(&(free_area.free_list)));
 
     struct Page *p;
     assert((p = alloc_page()) == p0);
     assert(alloc_page() == NULL);
 
-    assert(nr_free == 0);
-    free_list = free_list_store;
-    nr_free = nr_free_store;
+    assert(free_area.nr_free == 0);
+    free_area.free_list = free_list_store;
+    free_area.nr_free = nr_free_store;
 
     free_page(p);
     free_page(p1);
@@ -211,8 +322,8 @@ basic_check(void) {
 static void
 default_check(void) {
     int count = 0, total = 0;
-    list_entry_t *le = &free_list;
-    while ((le = list_next(le)) != &free_list) {
+    list_entry_t *le = &(free_area.free_list);
+    while ((le = list_next(le)) != &(free_area.free_list)) {
         struct Page *p = le2page(le, page_link);
         assert(PageProperty(p));
         count ++, total += p->property;
@@ -225,13 +336,13 @@ default_check(void) {
     assert(p0 != NULL);
     assert(!PageProperty(p0));
 
-    list_entry_t free_list_store = free_list;
-    list_init(&free_list);
-    assert(list_empty(&free_list));
+    list_entry_t free_list_store = free_area.free_list;
+    list_init(&(free_area.free_list));
+    assert(list_empty(&(free_area.free_list)));
     assert(alloc_page() == NULL);
 
-    unsigned int nr_free_store = nr_free;
-    nr_free = 0;
+    unsigned int nr_free_store = free_area.nr_free;
+    free_area.nr_free = 0;
 
     free_pages(p0 + 2, 3);
     assert(alloc_pages(4) == NULL);
@@ -256,14 +367,14 @@ default_check(void) {
     assert((p0 = alloc_pages(5)) != NULL);
     assert(alloc_page() == NULL);
 
-    assert(nr_free == 0);
-    nr_free = nr_free_store;
+    assert(free_area.nr_free == 0);
+    free_area.nr_free = nr_free_store;
 
-    free_list = free_list_store;
+    free_area.free_list = free_list_store;
     free_pages(p0, 5);
 
-    le = &free_list;
-    while ((le = list_next(le)) != &free_list) {
+    le = &(free_area.free_list);
+    while ((le = list_next(le)) != &(free_area.free_list)) {
         struct Page *p = le2page(le, page_link);
         count --, total -= p->property;
     }
