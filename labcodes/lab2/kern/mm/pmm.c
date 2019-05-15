@@ -190,6 +190,7 @@ nr_free_pages(void) {
 
 /* pmm_init - initialize the physical memory management
  * check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/implement_pages_mem_managment.html
+ * TODO: continue investigating what's the memory fragment.
  * */
 static void
 page_init(void) {
@@ -200,6 +201,7 @@ page_init(void) {
     cprintf("e820map:\n");
     int i;
     for (i = 0; i < memmap->nr_map; i ++) {
+        // the first `begin` is 0.
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         cprintf("  memory: %08llx, [%08llx, %08llx], type = %d.\n",
                 memmap->map[i].size, begin, end - 1, memmap->map[i].type);
@@ -293,6 +295,8 @@ page_init(void) {
 
 //TODO: where's the enable?
 //boot_map_segment - setup&enable the paging mechanism
+// The function initialize the Page Table.
+// https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/implement_pages_mem_managment.html
 // parameters
 //  la:   linear address of this memory need to map (after x86 segment map)
 //  size: memory size
@@ -307,6 +311,8 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, uintptr_t pa, uint32_t
     for (; n > 0; n --, la += PGSIZE, pa += PGSIZE) {
         pte_t *ptep = get_pte(pgdir, la, 1);
         assert(ptep != NULL);
+        // check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/x86_pages_hardware.html
+        // for all bits in page table entry.
         *ptep = pa | PTE_P | perm;
     }
 }
@@ -377,7 +383,7 @@ pmm_init(void) {
 }
 
 //get_pte - get pte and return the kernel virtual address of this pte for la
-//        - if the PT contians this pte didn't exist, alloc a page for PT
+//        - if the PT contains this pte didn't exist, alloc a page for PT
 // parameter:
 //  pgdir:  the kernel virtual base address of PDT
 //  la:     the linear address need to map
@@ -418,6 +424,26 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
+    pde_t* pde = &(pgdir[PDX(la)]);
+    if (!(*pde & PTE_P)) {
+        panic("pde doesn't exist");
+    }
+    struct Page* page = NULL;
+    // allocate one page
+    if (!create || (page = alloc_pages(1)) == NULL) {
+        return NULL;
+    }
+    page->ref = 1;
+    SetPageReserved(page);
+    // pa is the physical addr that (struct Page) manages.
+    uintptr_t pa = page2pa(page);
+    memset(KADDR(pa), 0, PGSIZE);
+    // pa is also the base addr of Page Table.
+    // Write pa to page directory table.
+    *pde = pa | PTE_P | PTE_W | PTE_U;
+    // &((pte_t *)KADDR(PDE_ADDR(*pdep)))[PTX(la)];
+    uintptr_t pte_addr = PDE_ADDR(*pde); // physical base addr of PTE
+    return &((pte_t*)(KADDR(pte_addr)))[PTX(la)];
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir

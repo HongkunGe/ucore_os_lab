@@ -72,6 +72,8 @@ void print_pgdir(void);
         })
 
 // All pages and number of pages.
+// Check pmm.c:222
+// `pages` is the address that end of uCore kernel images is rounded up to next page.(`end` is defined in kernel.ld).
 extern struct Page *pages;
 extern size_t npage;
 
@@ -82,6 +84,8 @@ page2ppn(struct Page *page) {
 }
 
 // index of the page in PT&PDT? Physical address.
+// DIRECTLY use (struct Page) order to indicate the physical Order of the real page.
+// NOTE: That means the real page starting from 0.
 static inline uintptr_t
 page2pa(struct Page *page) {
     return page2ppn(page) << PGSHIFT;
