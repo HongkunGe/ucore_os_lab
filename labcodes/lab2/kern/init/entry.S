@@ -12,6 +12,8 @@ kern_entry:
     movl $REALLOC(__boot_pgdir), %eax
     movl %eax, %cr3
     # before enable paging, lab2 stage 2： virt addr - 0xC0000000 = linear addr = phy addr
+    # TODO: what's the point of using temporary __boot_pgdir for one-one mapping? we seems not using any mapping here.
+    #
 
     # enable paging
     movl %cr0, %eax
@@ -25,9 +27,12 @@ kern_entry:
     # https://stackoverflow.com/questions/11212444/what-does-the-leal-assembly-instruction-do
     # update eip, so ucore goes to high-end virtual space
     # now, eip = 0x1.....(which is the value not updated yet) why not just jmp next ????
+    # %eax = KERNBASE + 0x1...
     leal next, %eax
 
     # https://en.wikipedia.org/wiki/JMP_(x86_instruction) JMP loads the IP register with the new value
+    # https://stackoverflow.com/questions/30802831/jmp-instruction-asterisk-eax
+    # It will jump to the address contained in register eax
     # set eip = KERNBASE + 0x1.....
     jmp *%eax
 next:
@@ -68,7 +73,7 @@ bootstacktop:
 __boot_pgdir:
 .globl __boot_pgdir
     # TODO: need to understand. why there're two mappings???
-    # I know this is used after paging is enabled. but how???
+    # I know this is used after paging is enabled. but how??? who're actually using this??/
     # 1st one is one-one mapping.
     # map va 0 ~ 4M to pa 0 ~ 4M (temporary)
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)

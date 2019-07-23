@@ -231,42 +231,16 @@ page_init(void) {
      * */
     // set the bit for PG_reserved, the memory starting from `pages` is reserved for kernel.
     // TODO: SetPageReserved is used to setbit for all the pages, right? Page struct covers both
+    // TODO: what's PG_reserved for?? reserve for all kernel space?
     // 1. 0 ~ pages + sizeof(struct Page) npage)
     // 2. above pages + sizeof(struct Page) npage)
     // pages ~ pages + npages : totally there're npage Page struct; they are ALL marked with `PG_reserved`.
     // My understanding: starting from `pages` is space for memory management.
     // inside the space, mark each of Page struct with `PG_reserved`.
-    //TODO: where is PDE and PTE???
+    //TODO: where is PDE and PTE??
     for (i = 0; i < npage; i ++) {
-        SetPageReserved(pages + i);
+        SetPageReserved(pages + i); // marks all of the pages. ALL npage.
     } //
-
-    /* *
- * Virtual memory map:                                          Permissions
- *                                                              kernel/user
- *
- *     4G ------------------> +---------------------------------+
- *                            |                                 |
- *                            |         Empty Memory (*)        |
- *                            |                                 |
- *                            +---------------------------------+ 0xFB000000
- *                            |   Cur. Page Table (Kern, RW)    | RW/-- PTSIZE
- *     VPT -----------------> +---------------------------------+ 0xFAC00000
- *                            |        Invalid Memory (*)       | --/--
- *     KERNTOP -------------> +---------------------------------+ 0xF8000000 (PA:0x38000000)
- *                            |                                 |
- *                            |    Remapped Physical Memory     | RW/-- KMEMSIZE
- *                            |                                 |
- *     KERNBASE ------------> +---------------------------------+ 0xC0000000 (PA:0x00000000)
- *                            |                                 |
- *                            |                                 |
- *                            |                                 |
- *                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * (*) Note: The kernel ensures that "Invalid Memory" is *never* mapped.
- *     "Empty Memory" is normally unmapped, but user programs may map pages
- *     there if desired.
- *
- * */
 
     // start of the free user space memory. TRUE!!
     // sizeof(struct Page) : Page data structure size
@@ -293,7 +267,6 @@ page_init(void) {
     }
 }
 
-//TODO: where's the enable?
 //boot_map_segment - setup&enable the paging mechanism
 // The function initialize the Page Table.
 // https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/implement_pages_mem_managment.html
@@ -329,12 +302,14 @@ boot_alloc_page(void) {
     return page2kva(p);
 }
 
+// 3rd phase.
 //pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup paging mechanism 
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
 pmm_init(void) {
     // We've already enabled paging
-    // TODO: what's this for? boot_cr3 is not used?
+    // should be just a notation of cr3 register stored value. PD address.
+    // boot_pgdir pa has already been put in cr3 register in entry.S: movl $REALLOC(__boot_pgdir), %eax
     boot_cr3 = PADDR(boot_pgdir);
 
     //We need to alloc/free the physical memory (granularity is 4KB or other size). 
@@ -357,11 +332,14 @@ pmm_init(void) {
 
     // recursively insert boot_pgdir in itself
     // to form a virtual page table at virtual address VPT
+    // https://segmentfault.com/a/1190000009450840
+    // https://chyyuu.gitbooks.io/ucore_os_docs/content/lab2/lab2_3_3_6_self_mapping.html
     boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_P | PTE_W;
 
     // map all physical memory to linear memory with base linear addr KERNBASE
     // linear_addr KERNBASE ~ KERNBASE + KMEMSIZE = phy_addr 0 ~ KMEMSIZE
     // Transitional period.
+    // NOTE: physical page starts from 0.
     boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);
 
     // Before gdt_init, segment is not updated.

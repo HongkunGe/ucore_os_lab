@@ -3,7 +3,7 @@ EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 SLASH	:= /
 
-V       := @
+V       :=
 #need llvm/cang-3.5+
 #USELLVM := 1
 # try to infer the correct GCCPREFX
@@ -152,8 +152,8 @@ $(kernel): tools/kernel.ld
 $(kernel): $(KOBJS)
 	@echo + ld $@
 	$(V)$(LD) $(LDFLAGS) -T tools/kernel.ld -o $@ $(KOBJS)
-	@$(OBJDUMP) -S $@ > $(call asmfile,kernel)
-	@$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel)
+	$(OBJDUMP) -S $@ > $(call asmfile,kernel)
+	$(OBJDUMP) -t $@ | $(SED) '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $(call symfile,kernel)
 
 $(call create_target,kernel)
 
