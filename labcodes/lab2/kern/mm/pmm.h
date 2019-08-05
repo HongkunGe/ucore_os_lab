@@ -86,11 +86,16 @@ page2ppn(struct Page *page) {
 // index of the page in PT&PDT? Physical address.
 // DIRECTLY use (struct Page) order to indicate the physical Order of the real page.
 // NOTE: That means the real page starting from 0.
+// TODO: why page struct entry index << 12 is the physical address?
 static inline uintptr_t
 page2pa(struct Page *page) {
     return page2ppn(page) << PGSHIFT;
 }
 
+// physical addr to page struct
+// NOTE: this means all page structs are placed as an array with the
+// same order of physical addresses of all physical pages.
+// NOTE: ONE page struct <=> ONE physical Page
 static inline struct Page *
 pa2page(uintptr_t pa) {
     if (PPN(pa) >= npage) {
@@ -109,12 +114,13 @@ kva2page(void *kva) {
     return pa2page(PADDR(kva));
 }
 
+// all Page struct are aligned in order starting in array 'pages';
 static inline struct Page *
 pte2page(pte_t pte) {
     if (!(pte & PTE_P)) {
         panic("pte2page called with invalid pte");
     }
-    return pa2page(PTE_ADDR(pte));
+    return pa2page(PTE_ADDR(pte)); // &pages[((pte) & ~0xFFF) >> 12];
 }
 
 static inline struct Page *

@@ -195,6 +195,7 @@ rcr3(void) {
     return cr3;
 }
 
+// https://wiki.osdev.org/TLB
 static inline void
 invlpg(void *addr) {
     asm volatile ("invlpg (%0)" :: "r" (addr) : "memory");

@@ -237,7 +237,6 @@ page_init(void) {
     // pages ~ pages + npages : totally there're npage Page struct; they are ALL marked with `PG_reserved`.
     // My understanding: starting from `pages` is space for memory management.
     // inside the space, mark each of Page struct with `PG_reserved`.
-    //TODO: where is PDE and PTE??
     for (i = 0; i < npage; i ++) {
         SetPageReserved(pages + i); // marks all of the pages. ALL npage.
     } //
@@ -286,7 +285,7 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, uintptr_t pa, uint32_t
         assert(ptep != NULL);
         // check https://chyyuu.gitbooks.io/simple_os_book/zh/chapter-3/x86_pages_hardware.html
         // for all bits in page table entry.
-        *ptep = pa | PTE_P | perm;
+        *ptep = pa | PTE_P | perm; // pa: page physical base addr
     }
 }
 
@@ -318,7 +317,7 @@ pmm_init(void) {
     //Then pmm can alloc/free the physical memory. 
     //Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
     init_pmm_manager();
-
+    cprintf("check point - after init_pmm_manager!\n");
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list
     page_init();
@@ -330,10 +329,19 @@ pmm_init(void) {
 
     static_assert(KERNBASE % PTSIZE == 0 && KERNTOP % PTSIZE == 0);
 
+    /*SELF-MAPPING*/
     // recursively insert boot_pgdir in itself
     // to form a virtual page table at virtual address VPT
     // https://segmentfault.com/a/1190000009450840
     // https://chyyuu.gitbooks.io/ucore_os_docs/content/lab2/lab2_3_3_6_self_mapping.html
+    // 1. now we could visit PageDir via VPD + 0xF8000000 >> 22; VPD is (VPT10)(VPT10)(0), so
+    // Going through pageDir and PageTable manipulation, (VPT10)(VPT10) will point to base physical addr of PD, so the
+    // last 12 bits can be used to index PD.
+    // 2. VPT + addr >> 12 can be used to query page table(must be aligned to 4MB). (VPT+addr) will first point PD by (VPT),
+    // then addr(upper_10) will be used to query index of PD and find base addr of PT. then addr(lower_10) is the index of PT.
+    // so we could find the base physical addr of the TARGET ADDRESS.
+    // boot_pgdir is same as __boot_pgdir, a pointer(or array), which store the virtual addr of PD.
+    // PADDR(boot_pgdir) is the physical addr of PD.
     boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_P | PTE_W;
 
     // map all physical memory to linear memory with base linear addr KERNBASE
@@ -361,7 +369,7 @@ pmm_init(void) {
 }
 
 //get_pte - get pte and return the kernel virtual address of this pte for la
-//        - if the PT contains this pte didn't exist, alloc a page for PT
+//        - if the PT containing this pte didn't exist, alloc a page for PT
 // parameter:
 //  pgdir:  the kernel virtual base address of PDT
 //  la:     the linear address need to map
@@ -402,26 +410,26 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
-    pde_t* pde = &(pgdir[PDX(la)]);
-    if (!(*pde & PTE_P)) {
-        panic("pde doesn't exist");
+    pde_t *pdep = &pgdir[PDX(la)]; // x86 MMU: 1st phase => get PDE check evernote screenshot: Lab2: Memory management
+    // if Page Directory Elem not exist (not present), need to allocate a page for Page Table.
+    if (!(*pdep & PTE_P)) {
+        struct Page *page;
+        if (!create || (page = alloc_page()) == NULL) {
+            return NULL;
+        }
+        set_page_ref(page, 1);
+        // Page is allocated by certain algorithm
+        // then convert it to physical addr
+        uintptr_t pa = page2pa(page);
+        memset(KADDR(pa), 0, PGSIZE);
+        *pdep = pa | PTE_U | PTE_W | PTE_P;
     }
-    struct Page* page = NULL;
-    // allocate one page
-    if (!create || (page = alloc_pages(1)) == NULL) {
-        return NULL;
-    }
-    page->ref = 1;
-    SetPageReserved(page);
-    // pa is the physical addr that (struct Page) manages.
-    uintptr_t pa = page2pa(page);
-    memset(KADDR(pa), 0, PGSIZE);
-    // pa is also the base addr of Page Table.
-    // Write pa to page directory table.
-    *pde = pa | PTE_P | PTE_W | PTE_U;
-    // &((pte_t *)KADDR(PDE_ADDR(*pdep)))[PTX(la)];
-    uintptr_t pte_addr = PDE_ADDR(*pde); // physical base addr of PTE
-    return &((pte_t*)(KADDR(pte_addr)))[PTX(la)];
+    // (KADDR(pte_addr)) find virtual addr of page table (base addr) then use index.
+    // &((pte_t*)(KADDR(pte_addr))) convert raw virtual to page table pointer.(page table array)_
+    // [PTX(la)] page table idx, used to read from the page table.
+    // pte_addr: physical base addr of a page table by fetching higher 20 bits of addr.
+    uintptr_t pte_addr = PDE_ADDR(*pdep);
+    return &((pte_t *)KADDR(pte_addr))[PTX(la)];
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -467,6 +475,18 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    if(!(*ptep & PTE_P)) {
+        return; // pte not present
+    }
+    struct Page *p = pte2page(*ptep);
+    if(p->ref != 0) {
+        page_ref_dec(p);
+        if(p->ref == 0) {
+            free_page(p);
+        }
+        *ptep = 0;
+    }
+    tlb_invalidate(pgdir, la);
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
@@ -488,7 +508,7 @@ page_remove(pde_t *pgdir, uintptr_t la) {
 //note: PT is changed, so the TLB need to be invalidate 
 int
 page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
-    pte_t *ptep = get_pte(pgdir, la, 1);
+    pte_t *ptep = get_pte(pgdir, la, 1); // get PTE for LA addr
     if (ptep == NULL) {
         return -E_NO_MEM;
     }
@@ -496,7 +516,7 @@ page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
     if (*ptep & PTE_P) {
         struct Page *p = pte2page(*ptep);
         if (p == page) {
-            page_ref_dec(page);
+            page_ref_dec(page); // already referenced
         }
         else {
             page_remove_pte(pgdir, la, ptep);
@@ -527,7 +547,7 @@ check_pgdir(void) {
     assert(npage <= KMEMSIZE / PGSIZE);
     assert(boot_pgdir != NULL && (uint32_t)PGOFF(boot_pgdir) == 0);
     assert(get_page(boot_pgdir, 0x0, NULL) == NULL);
-
+    cprintf("check point 1!\n");
     struct Page *p1, *p2;
     p1 = alloc_page();
     assert(page_insert(boot_pgdir, p1, 0x0, 0) == 0);
@@ -550,7 +570,7 @@ check_pgdir(void) {
 
     assert(page_insert(boot_pgdir, p1, PGSIZE, 0) == 0);
     assert(page_ref(p1) == 2);
-    assert(page_ref(p2) == 0);
+    assert(page_ref(p2) == 0); // TODO: has issue.
     assert((ptep = get_pte(boot_pgdir, PGSIZE, 0)) != NULL);
     assert(pte2page(*ptep) == p1);
     assert((*ptep & PTE_U) == 0);

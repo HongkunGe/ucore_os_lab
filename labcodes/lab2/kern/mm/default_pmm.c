@@ -131,6 +131,9 @@ default_init(void) {
  * */
 static void
 default_init_memmap(struct Page *base, size_t n) {
+    // NOTE: ONE page struct <=> ONE physical Page
+    // but free_list data structure connects all the page structs which are the
+    // starting page of a block whose size is n.
     assert(n > 0);
 
     struct Page *page = base;
@@ -190,7 +193,7 @@ default_alloc_pages(size_t n) {
     list_entry_t* le = &(free_area.free_list);
     // the last element of the free_list points to the dummy head of free_list.
     while ((le = list_next(le)) != &(free_area.free_list)) {
-        p = le2page(le, page_link);
+        p = le2page(le, page_link); // from page_link of current list elem to the Page struct pointer.
         if(p->property >= n) {
             ClearPageProperty(p); // PG_property = 0
             if(p->property > n) {
@@ -225,6 +228,11 @@ default_alloc_pages(size_t n) {
 static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
+    struct Page* p = base;
+    for (;p != base + n; p++) {
+        p->flags = 0;
+        set_page_ref(p, 0);
+    }
     // dummy header of all list_entry_t used to find all free blocks
     list_entry_t* le = &(free_area.free_list);
     while ((le = list_next(le)) != &(free_area.free_list)) {
